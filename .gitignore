@@ -1,0 +1,64 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Jupyter/IPython
+.ipynb_checkpoints/
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+.coverage*
+.pytest_cache/
+
+# Type checker caches
+.mypy_cache/
+.pytype/
+.dmypy.json
+
+# Lint caches
+.ruff_cache/
+.pyre/
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+*~
+
+# macOS
+.DS_Store
+
+# Local data / artifacts
+logs/
+checkpoints/
+outputs/
