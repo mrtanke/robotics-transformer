@@ -13,3 +13,8 @@ def test_encode_decode_torch():
     a2 = tokenizer.decode(t)
     assert a2.shape == a.shape
     assert torch.all((a2[:, -1] >= 0) & (a2[:, -1] <= 2))
+
+
+main = __name__ == "__main__"
+if main:
+    test_encode_decode_torch()

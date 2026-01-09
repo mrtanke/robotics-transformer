@@ -119,4 +119,4 @@ class robotic_transformerPolicy(nn.Module):
             predicted_action_tokens = torch.cat([predicted_action_tokens, next_token], dim=1)
             current_sequence = torch.cat([current_sequence, next_token], dim=1)
 
-        return predicted_action_tokens
+        return predicted_action_tokens # (B, 11)

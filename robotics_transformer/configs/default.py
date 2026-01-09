@@ -29,10 +29,10 @@ class robotic_transformerConfig:
     max_seq_len: int = 59
 
     # training
-    batch_size: int = 16
+    batch_size: int = 4
     lr: float = 3e-4
     weight_decay: float = 0.05
     grad_clip: float = 1.0 # max gradient L2 norm
-    epochs: int = 5
+    epochs: int = 8
     num_workers: int = 4
     log_every: int = 50

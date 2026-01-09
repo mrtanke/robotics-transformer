@@ -1,6 +1,13 @@
 from __future__ import annotations
 import torch
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from robotics_transformer.configs.default import robotic_transformerConfig
 from robotics_transformer.models.policy import robotic_transformerPolicy
 from robotics_transformer.tokenizers.action_tokenizer import ActionTokenizer
