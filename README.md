@@ -1,11 +1,11 @@
-# robotics-transformer
+## robotics-transformer
 Implementation of **RT1 (Robotic Transformer)** in Pytorch, from [RT-1: Robotics Transformer for Real-World Control at Scale](https://arxiv.org/abs/2212.06817).
 
 This repo focus on core ideas appeared in the paper, like model design: FiLM-conditioned EfficientNet tokens, TokenLearner compression, and a causal decoder that predicts discretized actions. To keep things lightweight and easy to study, it replaces heavy TFDS pipelines with a small synthetic data generator. It mirrors the data shapes of RT-1 (6 image frames + 512-d instruction + 11 action tokens).
 
-More implementation details will land in an upcoming blog post: [RT-1 From-Scratch Notes (coming soon)](https://example.com/blog-post-placeholder)
+You can find more implementation details in: [Reproducing Robotics Transformer 1](https://mrtanke.github.io/projects/2026-01-10-reproducing-robotics-transformer-1/).
 
-## Install
+### Install
 
 Create a virtual environment (optional) and install the project in editable mode:
 
@@ -15,7 +15,7 @@ python -m venv .venv
 pip install -e .
 ```
 
-## Synthetic dataset
+### Synthetic dataset
 
 We use [`SyntheticRTDataset`](robotics_transformer/data/synthetic_dataset.py) to emulate RT-1 batches:
 
@@ -29,7 +29,7 @@ Default windowing matches RT-1 conventions, in [`robotic_transformerConfig`](rob
 - instruction embedding: fixed for each episode
 - action dims: `action_dims = 11` with `action_bins = 256`
 
-## Quick sanity checks
+### Quick sanity checks
 
 1. Inspect the synthetic loader and tensor shapes:
    ```bash
@@ -48,13 +48,13 @@ Default windowing matches RT-1 conventions, in [`robotic_transformerConfig`](rob
    pytest
    ```
 
-## Training
+### Training
 
 ```bash
 python scripts/smoke_test_trainbc.py --epochs train.py
 ```
 
 
-## Acknowledgements
+### Acknowledgements
 
-This project draws inspiration from RT-1 and related works on large-scale robotic transformers.
+This project draws inspiration from RT-1 and related works on robotic transformers.

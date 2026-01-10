@@ -23,22 +23,23 @@ class FiLMEfficientNetB3Tokenizer(nn.Module):
       4. adaptive pool to (9,9)
       5. flatten to 81 tokens
     """
-    def __init__(self, image_size: int = 300, text_dim: int = 512, token_dim: int = 512, grid: Tuple[int, int] = (9, 9)):
+    def __init__(self, image_size: int = 300, instruction_dim: int = 512, token_dim: int = 512, grid: Tuple[int, int] = (9, 9)):
         super().__init__()
         self.image_size = image_size
-        self.text_dim = text_dim
+        self.instruction_dim = instruction_dim
         self.token_dim = token_dim
         self.grid = grid
 
         self.stages = torchvision.models.efficientnet_b3(weights='DEFAULT').features
 
         stage_channels = self._infer_stage_channels()
-        self.films = nn.ModuleList([FiLM(text_dim=text_dim, channels=channel) for channel in stage_channels])
+        self.films = nn.ModuleList([FiLM(instruction_dim=instruction_dim, channels=channel) for channel in stage_channels])
 
         last_channel = stage_channels[-1]
         self.proj = nn.Conv2d(last_channel, token_dim, kernel_size=1, stride=1, padding=0)
         self.pool = nn.AdaptiveAvgPool2d(self.grid)
         self.flatten_tokens = Rearrange("b d h w -> b (h w) d") 
+    
     @torch.no_grad()
     def _infer_stage_channels(self) -> List[int]:
         x = torch.zeros(1, 3, self.image_size, self.image_size)
@@ -49,17 +50,17 @@ class FiLMEfficientNetB3Tokenizer(nn.Module):
         
         return channels
 
-    def forward(self, images: torch.Tensor, text_emb: torch.Tensor) -> torch.Tensor:
+    def forward(self, images: torch.Tensor, instruction_emb: torch.Tensor) -> torch.Tensor:
         """
         images: (B, 3, H, W)
-        text_emb: (B, text_dim)
+        instruction_emb: (B, instruction_dim)
         returns: (B, 81, token_dim)
         """
         x = images
         for stage, film in zip(self.stages, self.films):
             x = stage(x)
-            x = film(x, text_emb)
+            x = film(x, instruction_emb)
 
         x = self.proj(x) # (B, token_dim, h, w)
         x = self.pool(x) # (B, token_dim, 9, 9)
-        return self.flatten_tokens(x)
+        return self.flatten_tokens(x) # (B, 81, token_dim)

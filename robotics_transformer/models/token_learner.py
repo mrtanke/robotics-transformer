@@ -9,8 +9,8 @@ import torch.nn as nn
 class TokenLearner(nn.Module):
     """
     Compress the token sequence from N -> M tokens:
-      input tokens:  (B, N, D)
-      output tokens: (B, M, D)
+      input tokens:  (B, N, D), (B, 81, 512)
+      output tokens: (B, M, D), (B, 8, 512)
 
     Learns M attention maps over the N tokens and produces weighted sums.
     """
@@ -39,4 +39,5 @@ class TokenLearner(nn.Module):
         attn = self.mlp(tokens).softmax(dim=1)  # (B, N, M)
 
         # (B, M, N) @ (B, N, D) -> (B, M, D)
+        # (B, 8, 81) @ (B, 81, 512) -> (B, 8, 512)
         return torch.matmul(attn.transpose(1, 2), tokens)
