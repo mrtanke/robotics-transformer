@@ -23,9 +23,11 @@ def main():
     instruction = torch.randn(B, 512)
     target = torch.randint(0, cfg.action_bins, (B, cfg.action_dims)) # (B, 11)
     target[:, -1] = torch.randint(0, 3, (B,)) # mode dim in {0,1,2}
+    # Action history for all T timesteps (random for smoke test)
+    action_history = torch.randint(0, cfg.action_bins, (B, cfg.history_len, cfg.action_dims))
 
     with torch.no_grad():
-        logits = model(images, instruction, target)
+        logits = model(images, instruction, action_history, target)
     print("logits:", tuple(logits.shape))
     assert logits.shape == (B, cfg.action_dims, cfg.action_bins)
     print("smoke_test_forward passed")

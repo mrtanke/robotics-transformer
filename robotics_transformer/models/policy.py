@@ -13,10 +13,11 @@ from robotics_transformer.tokenizers.action_tokenizer import ActionTokenizer
 
 class robotic_transformerPolicy(nn.Module):
     """
-    RT-1 policy:
-      - tokens from 6 images (FiLM EffNet-B3 -> 81 -> TokenLearner -> 8/image)
+    RT-1 policy
+      - tokens from T images (FiLM EffNet-B3 -> 81 -> TokenLearner -> 8/image)
       - decoder-only transformer with causal mask
-      - autoregressive prediction of 11 action tokens (256 bins each)
+      - per-timestep interleaved input: [obs_1|act_1|obs_2|act_2|...|obs_T|act_T]
+      - autoregressive prediction of 11 action tokens (256 bins each) at last timestep
     """
     def __init__(self, cfg: robotic_transformerConfig):
         super().__init__()
@@ -48,75 +49,125 @@ class robotic_transformerPolicy(nn.Module):
 
         self.head = nn.Linear(cfg.vision_token_dim, cfg.action_bins)
 
+
+    # Observation encoder
     def encode_obs(self, images_history: torch.Tensor, instruction_emb: torch.Tensor) -> torch.Tensor:
         """
-        Instruction and image tokenization.
+        Instruction and image tokenization, preserving per-timestep grouping.
 
-        images_history: (B, 6, 3, H, W) - 6 history images
+        images_history: (B, T, 3, H, W)
         instruction_emb: (B, 512)
-        returns: (B, 48, D) - encoded observation tokens
+        returns: (B, T, tokens_per_image, D)
         """
+        T = images_history.shape[1]
         x = rearrange(images_history, "b t c h w -> (b t) c h w")
-        text = repeat(instruction_emb, "b d -> (b t) d", t=images_history.shape[1])
-        
-        tokens_81 = self.vision(x, text) # (B*T, 81, D)
-        tokens_8 = self.token_learner(tokens_81) # (B*T, 8, D)
-        tokens_8 = rearrange(
-            tokens_8,
-            "(b t) n d -> b (t n) d",
-            t=images_history.shape[1],
-        )
-        return tokens_8  # (B, 48, D)
+        text = repeat(instruction_emb, "b d -> (b t) d", t=T)
 
-    def forward(self, images_history: torch.Tensor, instruction_emb: torch.Tensor, target_action_tokens: torch.Tensor) -> torch.Tensor:
+        tokens_81 = self.vision(x, text)         # (B*T, 81, D)
+        tokens_8 = self.token_learner(tokens_81)  # (B*T, tokens_per_image, D)
+        tokens_8 = rearrange(tokens_8, "(b t) n d -> b t n d", t=T)
+        return tokens_8  # (B, T, 8, D)
+
+
+    # Helpers: build the interleaved [obs_t | act_t] sequence
+    def _interleave(self, obs_tokens: torch.Tensor, act_emb: torch.Tensor) -> torch.Tensor:
         """
-        images_history: (B, 6, 3, H, W)
-        instruction_emb: (B, 512)
-        target_action_tokens: (B, 11)
-        returns: (B, 11, 256)
+        obs_tokens: (B, T, N_obs, D)
+        act_emb:    (B, T, N_act, D)
+        returns:    (B, T*(N_obs+N_act), D)
         """
-        observation_tokens = self.encode_obs(images_history, instruction_emb)
+        per_step = torch.cat([obs_tokens, act_emb], dim=2)  # (B, T, N_obs+N_act, D)
+        return rearrange(per_step, "b t n d -> b (t n) d")
 
-        action_in = self.action_tokenizer.make_action_input_tokens(target_action_tokens) # (B, 11)
-        action_in_emb = self.action_emb(action_in) # (B, 11, D)
 
-        x = torch.cat([observation_tokens, action_in_emb], dim=1) # (B, 59, D)
+    # Training forward (teacher-forced)
+    def forward(
+        self,
+        images_history: torch.Tensor,
+        instruction_emb: torch.Tensor,
+        action_tokens_history: torch.Tensor,
+        target_action_tokens: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        images_history:       (B, T, 3, H, W)
+        instruction_emb:      (B, 512)
+        action_tokens_history: (B, T, 11) – ground-truth actions for *every* timestep
+        target_action_tokens:  (B, 11)    – target for the current (last) timestep
+        returns:               (B, 11, 256) – logits for last timestep only
+        """
+        obs_tokens = self.encode_obs(images_history, instruction_emb)  # (B, T, 8, D)
+
+        # Build per-timestep action token ids
+        #   t < T-1 : ground-truth past actions (used as context)
+        #   t = T-1 : teacher-forced (BOS + shifted target)
+        act_ids = action_tokens_history.clone()          # (B, T, 11)
+        teacher_forced = self.action_tokenizer.make_action_input_tokens(
+            target_action_tokens
+        )                                                 # (B, 11)
+        act_ids[:, -1, :] = teacher_forced
+
+        act_emb = self.action_emb(act_ids)               # (B, T, 11, D)
+
+        x = self._interleave(obs_tokens, act_emb)        # (B, T*19, D)
         h = self.transformer(x)
-        h_action = h[:, -self.cfg.action_dims:, :] # (B, 11, D) = (B, 11, 512)
-        logits = self.head(h_action) # (B, 11, 256)
+
+        # Last T-th group's action positions are the final action_dims tokens
+        h_action = h[:, -self.cfg.action_dims:, :]       # (B, 11, D)
+        logits = self.head(h_action)                      # (B, 11, 256)
         return logits
 
+
+    # Inference (autoregressive generation at the last timestep)
     @torch.no_grad()
-    def generate_action_tokens(self, images_history: torch.Tensor, instruction_emb: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
+    def generate_action_tokens(
+        self,
+        images_history: torch.Tensor,
+        instruction_emb: torch.Tensor,
+        action_tokens_history: torch.Tensor,
+        temperature: float = 1.0,
+    ) -> torch.Tensor:
         """
-        Autoregressive action token generation.
-        images_history: (B, 6, 3, H, W)
-        instruction_emb: (B, 512)
-        temperature: sampling temperature
-        returns: (B, 11) predicted action tokens
+        Autoregressive action-token generation for the *current* (last) timestep.
+
+        images_history:        (B, T, 3, H, W)
+        instruction_emb:       (B, 512)
+        action_tokens_history: (B, T, 11) – past actions; last-timestep column is ignored
+        temperature:           sampling temperature
+        returns:               (B, 11)
         """
         self.eval()
         B = images_history.shape[0]
-        observation_tokens = self.encode_obs(images_history, instruction_emb)
+        T = images_history.shape[1]
+        device = images_history.device
 
-        current_sequence = torch.full(
-            (B, 1), 
-            self.action_tokenizer.bos_id, 
-            device=images_history.device, 
-            dtype=torch.int64
-        )
-        predicted_action_tokens = torch.empty((B, 0), device=images_history.device, dtype=torch.int64)
+        obs_tokens = self.encode_obs(images_history, instruction_emb)  # (B, T, 8, D)
+
+        # ---- fixed context: past timesteps (t=0..T-2) ----
+        if T > 1:
+            past_obs = obs_tokens[:, :-1]                              # (B, T-1, 8, D)
+            past_act_emb = self.action_emb(action_tokens_history[:, :-1])  # (B, T-1, 11, D)
+            past_context = self._interleave(past_obs, past_act_emb)    # (B, (T-1)*19, D)
+            cur_obs = obs_tokens[:, -1]                                 # (B, 8, D)
+            context = torch.cat([past_context, cur_obs], dim=1)        # (B, (T-1)*19 + 8, D)
+        else:
+            context = obs_tokens[:, 0]                                  # (B, 8, D)
+
+        # ---- autoregressive loop for last timestep's action tokens ----
+        cur_act = torch.full((B, 1), self.action_tokenizer.bos_id,
+                             device=device, dtype=torch.int64)
+        predicted = torch.empty((B, 0), device=device, dtype=torch.int64)
 
         for _ in range(self.cfg.action_dims):
-            action_emb = self.action_emb(current_sequence)
-            x = torch.cat([observation_tokens, action_emb], dim=1)
+            act_emb = self.action_emb(cur_act)                         # (B, k, D)
+            x = torch.cat([context, act_emb], dim=1)
             h = self.transformer(x)
-            last_token = h[:, -1, :]
+            last_h = h[:, -1, :]                                       # (B, D)
 
-            logits = self.head(last_token) / max(temperature, 1e-6)
+            logits = self.head(last_h) / max(temperature, 1e-6)
             probs = torch.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1) # (B,1)
-            predicted_action_tokens = torch.cat([predicted_action_tokens, next_token], dim=1)
-            current_sequence = torch.cat([current_sequence, next_token], dim=1)
+            next_tok = torch.multinomial(probs, num_samples=1)         # (B, 1)
 
-        return predicted_action_tokens # (B, 11)
+            predicted = torch.cat([predicted, next_tok], dim=1)
+            cur_act = torch.cat([cur_act, next_tok], dim=1)
+
+        return predicted  # (B, 11)

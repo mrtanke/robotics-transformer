@@ -46,13 +46,11 @@ class SyntheticRTDataset(IterableDataset):
         for _ in range(self.num_episodes):
             instruction = torch.randn(self.instruction_emb, generator=gen)
             frames = []
+            actions = []
 
             for t in range(self.episode_length):
                 frame = torch.rand(3, self.image_size, self.image_size, generator=gen)
                 frames.append(frame)
-
-                idxs = make_history_indices(t, self.history_len)
-                history = torch.stack([frames[i] for i in idxs], dim=0)
 
                 action_tokens = torch.randint(
                     low=0,
@@ -61,11 +59,21 @@ class SyntheticRTDataset(IterableDataset):
                     dtype=torch.long,
                     generator=gen,
                 )
+                actions.append(action_tokens)
+
+                img_idxs = make_history_indices(t, self.history_len)
+                history = torch.stack([frames[i] for i in img_idxs], dim=0)
+
+                # Action history aligned with image history (same windowing)
+                action_history = torch.stack(
+                    [actions[i] for i in img_idxs], dim=0
+                )  # (history_len, action_dims)
 
                 yield {
-                    "images": history.to(torch.float32), # (history_len, 3, H, W)
-                    "instruction_emb": instruction.to(torch.float32), # (instruction_emb,)
-                    "action_tokens": action_tokens, # (action_dims,)
+                    "images": history.to(torch.float32),            # (history_len, 3, H, W)
+                    "instruction_emb": instruction.to(torch.float32),  # (instruction_emb,)
+                    "action_tokens": action_tokens,                 # (action_dims,)  – target
+                    "action_tokens_history": action_history,         # (history_len, action_dims)
                 }
 
     # num_batches = number of episodes * episode length / batch_size

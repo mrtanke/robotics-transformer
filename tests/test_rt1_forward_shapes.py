@@ -13,7 +13,8 @@ def test_robotic_transformer_forward_shapes():
 
     target = torch.randint(0, cfg.action_bins, (B, cfg.action_dims)) # (B, 11)
     target[:, -1] = torch.randint(0, 3, (B,)) # mode dim in {0,1,2}
+    action_history = torch.randint(0, cfg.action_bins, (B, cfg.history_len, cfg.action_dims))
     
     with torch.no_grad():
-        logits = model(images, instruction, target) # (B, 11, 256)
+        logits = model(images, instruction, action_history, target) # (B, 11, 256)
     assert logits.shape == (B, cfg.action_dims, cfg.action_bins)

@@ -39,6 +39,7 @@ class FiLMEfficientNetB3Tokenizer(nn.Module):
         self.proj = nn.Conv2d(last_channel, token_dim, kernel_size=1, stride=1, padding=0)
         self.pool = nn.AdaptiveAvgPool2d(self.grid)
         self.flatten_tokens = Rearrange("b d h w -> b (h w) d") 
+    
     @torch.no_grad()
     def _infer_stage_channels(self) -> List[int]:
         x = torch.zeros(1, 3, self.image_size, self.image_size)

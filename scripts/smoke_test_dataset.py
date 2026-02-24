@@ -25,8 +25,9 @@ def main():
     for i, batch in enumerate(itertools.islice(dl, args.num_batches)):
         print(f"batch {i}:")
         print("  images:", tuple(batch["images"].shape))
-        print("  instr_emb:", tuple(batch["instr_emb"].shape))
+        print("  instruction_emb:", tuple(batch["instruction_emb"].shape))
         print("  action_tokens:", tuple(batch["action_tokens"].shape))
+        print("  action_tokens_history:", tuple(batch["action_tokens_history"].shape))
 
     print("smoke_test_dataset finished (schema looked OK)")
 

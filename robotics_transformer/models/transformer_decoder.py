@@ -18,6 +18,7 @@ class CausalSelfAttention(nn.Module):
         self.head_dim = dim // n_heads
         self.qkv = nn.Linear(dim, 3 * dim)
         self.proj = nn.Linear(dim, dim)
+        self.attn_drop_p = dropout
         self.proj_drop = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -28,7 +29,11 @@ class CausalSelfAttention(nn.Module):
         k = rearrange(k, "b t (h d) -> b h t d", h=self.n_heads)
         v = rearrange(v, "b t (h d) -> b h t d", h=self.n_heads)
 
-        y = F.scaled_dot_product_attention(q, k, v, dropout_p=0.1, is_causal=True)
+        y = F.scaled_dot_product_attention(
+            q, k, v,
+            dropout_p=self.attn_drop_p if self.training else 0.0,
+            is_causal=True,
+        )
         y = rearrange(y, "b h t d -> b t (h d)")
         y = self.proj_drop(self.proj(y))
         return y

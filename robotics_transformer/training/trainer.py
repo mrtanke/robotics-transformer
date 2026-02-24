@@ -48,8 +48,9 @@ def train_bc(
                 instruction_tensor = batch["instruction_emb"]
             instruction = instruction_tensor.to(device)
             action_tokens = batch["action_tokens"].to(device)
+            action_tokens_history = batch["action_tokens_history"].to(device)
 
-            logits = model(images, instruction, action_tokens)
+            logits = model(images, instruction, action_tokens_history, action_tokens)
             loss = action_ce_loss(logits, action_tokens)
             acc = token_accuracy(logits, action_tokens)
 

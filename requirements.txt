@@ -1,0 +1,9 @@
+torch>=2.1
+torchvision>=0.16
+numpy>=1.24
+pyyaml>=6.0
+tqdm>=4.66
+pytest>=7.4
+
+# Optional (only needed for TFDS/RLDS dataset loading)
+tensorflow-datasets>=4.9

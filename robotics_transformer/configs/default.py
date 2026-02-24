@@ -25,8 +25,9 @@ class robotic_transformerConfig:
     dropout: float = 0.1
     ff_mult: int = 4 # feedforward hidden dim multiplier
 
-    # Transformer input sequence length = 6*8 + 11 = 59 (obs tokens + action tokens)
-    max_seq_len: int = 59
+    # Transformer input: interleaved [obs_1|act_1|...|obs_T|act_T]
+    # = T * (tokens_per_image + action_dims) = 6 * (8 + 11) = 114
+    max_seq_len: int = 114
 
     # training
     batch_size: int = 4
