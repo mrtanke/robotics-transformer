@@ -26,7 +26,7 @@ class robotic_transformerPolicy(nn.Module):
 
         self.vision = FiLMEfficientNetB3Tokenizer(
             image_size=cfg.image_size,
-            text_dim=512,
+            instruction_dim=512,
             token_dim=cfg.vision_token_dim,
             grid=cfg.vision_grid,
         )

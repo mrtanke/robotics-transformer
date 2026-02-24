@@ -33,7 +33,7 @@ class FiLMEfficientNetB3Tokenizer(nn.Module):
         self.stages = torchvision.models.efficientnet_b3(weights='DEFAULT').features
 
         stage_channels = self._infer_stage_channels()
-        self.films = nn.ModuleList([FiLM(instruction_dim=instruction_dim, channels=channel) for channel in stage_channels])
+        self.films = nn.ModuleList([FiLM(text_dim=instruction_dim, channels=channel) for channel in stage_channels])
 
         last_channel = stage_channels[-1]
         self.proj = nn.Conv2d(last_channel, token_dim, kernel_size=1, stride=1, padding=0)
