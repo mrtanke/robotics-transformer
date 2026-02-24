@@ -3,7 +3,7 @@ Implementation of **RT1 (Robotic Transformer)** in Pytorch, from [RT-1: Robotics
 
 This repo focus on core ideas appeared in the paper, like model design: FiLM-conditioned EfficientNet tokens, TokenLearner compression, and a causal decoder that predicts discretized actions. Following the official implementation, the Transformer input uses a **per-timestep interleaved** structure: `[obs_1][act_1][obs_2][act_2]...[obs_T][act_T]`, where each timestep contributes 8 observation tokens + 11 action tokens = 19 tokens, for a total of 6 × 19 = 114 tokens. To keep things lightweight and easy to study, it replaces heavy TFDS pipelines with a small synthetic data generator.
 
-More implementation details will land in an upcoming blog post: [RT-1 From-Scratch Notes (coming soon)](https://example.com/blog-post-placeholder)
+You can find more implementation details in: [Reproducing Robotics Transformer 1](https://mrtanke.github.io/projects/2026-01-10-reproducing-robotics-transformer-1/).
 
 ### Install
 
@@ -58,4 +58,4 @@ python scripts/smoke_test_trainbc.py
 
 ### Acknowledgements
 
-This project draws inspiration from RT-1 and related works on large-scale robotic transformers.
+This project draws inspiration from RT-1 and related works on robotic transformers.
